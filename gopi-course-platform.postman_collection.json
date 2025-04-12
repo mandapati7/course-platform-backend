@@ -1,0 +1,802 @@
+{
+	"info": {
+		"_postman_id": "your-collection-id",
+		"name": "Gopi Course Platform API",
+		"description": "API collection for the course platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5011/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Register Instructor",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test Instructor\",\n    \"email\": \"instructor@example.com\",\n    \"password\": \"Password123!\",\n    \"role\": \"instructor\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"user@example.com\",\n    \"password\": \"Password123!\",\n    \"role\": \"user\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "register"]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.collectionVariables.set(\"token\", jsonData.token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"instructor@example.com\",\n    \"password\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "me"]
+						}
+					}
+				},
+				{
+					"name": "Update User Details",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Name\",\n    \"email\": \"updated@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/updatedetails",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "updatedetails"]
+						}
+					}
+				},
+				{
+					"name": "Update Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"currentPassword\": \"Password123!\",\n    \"newPassword\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/updatepassword",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "updatepassword"]
+						}
+					}
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/forgotpassword",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "forgotpassword"]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Courses",
+			"item": [
+				{
+					"name": "Get All Courses",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/courses",
+							"host": ["{{base_url}}"],
+							"path": ["courses"]
+						}
+					}
+				},
+				{
+					"name": "Create Course",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"New Test Course\",\n    \"description\": \"A comprehensive test course description that meets the length requirement\",\n    \"shortDescription\": \"A brief overview of the test course\",\n    \"price\": 99.99,\n    \"duration\": \"10 hours\",\n    \"level\": \"Beginner\",\n    \"thumbnail\": \"https://example.com/thumbnail.jpg\",\n    \"category\": \"Technology\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/courses",
+							"host": ["{{base_url}}"],
+							"path": ["courses"]
+						}
+					}
+				},
+				{
+					"name": "Get Single Course",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_url}}/courses/:id",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "course_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Course",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Updated Course Title\",\n    \"price\": 149.99\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/courses/:id",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "course_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Course",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/courses/:id",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "course_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Enroll in Course",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/courses/:id/enroll",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":id", "enroll"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "course_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Add Course Review",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"rating\": 5,\n    \"comment\": \"Great course!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/courses/:id/reviews",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":id", "reviews"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "course_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Course Progress",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"progress\": 50\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/courses/:id/progress",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":id", "progress"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "course_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Sections",
+			"item": [
+				{
+					"name": "Add Section",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"title\": \"Introduction Section\",\n\t\"description\": \"Overview of the course content\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/courses/:courseId/sections",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":courseId", "sections"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Section",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"title\": \"Updated Section Title\",\n\t\"description\": \"Updated section description\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/courses/:courseId/sections/:sectionId",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":courseId", "sections", ":sectionId"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here"
+								},
+								{
+									"key": "sectionId",
+									"value": "section_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Section",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/courses/:courseId/sections/:sectionId",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":courseId", "sections", ":sectionId"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here"
+								},
+								{
+									"key": "sectionId",
+									"value": "section_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Lessons",
+			"item": [
+				{
+					"name": "Add Lesson",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"title\": \"Introduction Lesson\",\n\t\"description\": \"First lesson of the course\",\n\t\"videoUrl\": \"https://example.com/video.mp4\",\n\t\"duration\": \"10:00\",\n\t\"isPreview\": true,\n\t\"resources\": [\"https://example.com/notes.pdf\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/courses/:courseId/sections/:sectionId/lessons",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":courseId", "sections", ":sectionId", "lessons"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here"
+								},
+								{
+									"key": "sectionId",
+									"value": "section_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Lesson",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"title\": \"Updated Lesson Title\",\n\t\"description\": \"Updated lesson description\",\n\t\"videoUrl\": \"https://example.com/updated-video.mp4\",\n\t\"duration\": \"15:00\",\n\t\"isPreview\": false,\n\t\"resources\": [\"https://example.com/updated-notes.pdf\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/courses/:courseId/sections/:sectionId/lessons/:lessonId",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":courseId", "sections", ":sectionId", "lessons", ":lessonId"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here"
+								},
+								{
+									"key": "sectionId",
+									"value": "section_id_here"
+								},
+								{
+									"key": "lessonId",
+									"value": "lesson_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Lesson",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/courses/:courseId/sections/:sectionId/lessons/:lessonId",
+							"host": ["{{base_url}}"],
+							"path": ["courses", ":courseId", "sections", ":sectionId", "lessons", ":lessonId"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here"
+								},
+								{
+									"key": "sectionId",
+									"value": "section_id_here"
+								},
+								{
+									"key": "lessonId",
+									"value": "lesson_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Get All Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications",
+							"host": ["{{base_url}}"],
+							"path": ["notifications"]
+						}
+					}
+				},
+				{
+					"name": "Create Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"Test Notification\",\n    \"message\": \"This is a test notification\",\n    \"recipients\": [\"user_id_here\"]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/notifications",
+							"host": ["{{base_url}}"],
+							"path": ["notifications"]
+						}
+					}
+				},
+				{
+					"name": "Mark All as Read",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/read-all",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "read-all"]
+						}
+					}
+				},
+				{
+					"name": "Mark as Read",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/:id/read",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", ":id", "read"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "notification_id_here"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Notification",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/notifications/:id",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "notification_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Payments",
+			"item": [
+				{
+					"name": "Process Stripe Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"courseId\": \"course_id_here\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/payments/stripe",
+							"host": ["{{base_url}}"],
+							"path": ["payments", "stripe"]
+						}
+					}
+				},
+				{
+					"name": "Get Payment History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/history",
+							"host": ["{{base_url}}"],
+							"path": ["payments", "history"]
+						}
+					}
+				},
+				{
+					"name": "Get Payment Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/payments/:id",
+							"host": ["{{base_url}}"],
+							"path": ["payments", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "payment_id_here"
+								}
+							]
+						}
+					}
+				}
+			]
+		}
+	]
+}
