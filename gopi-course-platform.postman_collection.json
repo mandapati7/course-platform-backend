@@ -337,6 +337,48 @@
 					}
 				},
 				{
+					"name": "Get Enrolled Courses",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/courses/enrolled",
+							"host": ["{{base_url}}"],
+							"path": ["courses", "enrolled"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Enrolled Courses (Alternative)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/courses?enrolled=true",
+							"host": ["{{base_url}}"],
+							"path": ["courses"],
+							"query": [
+								{
+									"key": "enrolled",
+									"value": "true"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "Add Course Review",
 					"request": {
 						"method": "POST",

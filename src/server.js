@@ -52,15 +52,33 @@ app.use((req, res, next) => {
   const chunks = [];
 
   res.write = function (chunk) {
-    chunks.push(chunk);
+    if (chunk) {
+      // Ensure chunk is a buffer
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
     return oldWrite.apply(res, arguments);
   };
 
   res.end = function (chunk) {
-    if (chunk) chunks.push(chunk);
+    if (chunk) {
+      // Ensure chunk is a buffer
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    
     console.log('\n=== Response ===');
     console.log('Status:', res.statusCode);
-    console.log('Body:', Buffer.concat(chunks).toString('utf8'));
+    
+    try {
+      if (chunks.length > 0) {
+        const body = Buffer.concat(chunks).toString('utf8');
+        console.log('Body:', body.length > 1000 ? body.substring(0, 1000) + '... (truncated)' : body);
+      } else {
+        console.log('Body: <empty>');
+      }
+    } catch (err) {
+      console.log('Error logging response body:', err.message);
+    }
+    
     oldEnd.apply(res, arguments);
   };
 
@@ -73,7 +91,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: [process.env.CLIENT_URL || 'http://localhost:3000', 'http://localhost:8081'],
   credentials: true
 }));
 
@@ -82,6 +100,17 @@ app.use(cookieParser());
 
 // Set static folder
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check endpoint
+app.get('/api/v1/health', (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Server is healthy',
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
 
 // Simple test route at root level
 app.get('/test', (req, res) => {

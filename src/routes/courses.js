@@ -13,16 +13,44 @@ const {
   deleteSection,
   addLesson,
   updateLesson,
-  deleteLesson
+  deleteLesson,
+  getEnrolledCourses
 } = require('../controllers/courses');
 
 const router = express.Router();
 
 const { protect, authorize } = require('../middleware/auth');
 
-router.route('/')
-  .get(getCourses)
-  .post(protect, authorize('instructor', 'admin'), createCourse);
+// This route needs to be before the :id routes to prevent "enrolled" from being treated as an ID
+router.get('/enrolled', protect, getEnrolledCourses);
+
+// Apply protect middleware to /api/v1/courses?enrolled=true
+router.get('/', (req, res, next) => {
+  if (req.query.enrolled === 'true') {
+    // Handle authentication errors explicitly for the enrolled query parameter
+    if (!req.headers.authorization) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to access this route'
+      });
+    }
+    
+    return protect(req, res, (err) => {
+      if (err) {
+        return res.status(401).json({
+          success: false,
+          message: 'Not authorized to access this route'
+        });
+      }
+      // After authentication, call getEnrolledCourses
+      return getEnrolledCourses(req, res, next);
+    });
+  }
+  // For normal requests without enrolled parameter, continue to getCourses
+  return getCourses(req, res, next);
+});
+
+router.post('/', protect, authorize('instructor', 'admin'), createCourse);
 
 router.route('/:id')
   .get(getCourse)

@@ -657,3 +657,186 @@ describe('Lesson Management', () => {
     });
   });
 });
+
+describe('Course Enrollment', () => {
+  let courseId;
+  let regularUser;
+  let instructorUser; // Added instructor user declaration
+  let userToken;
+
+  beforeEach(async () => {
+    // Create instructor user
+    instructorUser = await User.create({
+      name: 'Enrollment Instructor',
+      email: 'enroll.instructor@example.com',
+      password: 'Password123!',
+      role: 'instructor'
+    });
+
+    // Create regular user
+    regularUser = await User.create({
+      name: 'Enrollment Test User',
+      email: 'enroll.user@example.com',
+      password: 'Password123!',
+      role: 'user'
+    });
+
+    // Generate token
+    userToken = jwt.sign(
+      { id: regularUser._id, role: regularUser.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRE }
+    );
+
+    // Create a test course
+    const course = await Course.create({
+      title: 'Enrollment Test Course',
+      description: 'This is a course for testing enrollment features.',
+      shortDescription: 'Enrollment testing',
+      price: 49.99,
+      category: 'Testing',
+      duration: '5 hours',
+      level: 'Beginner',
+      thumbnail: 'https://example.com/thumbnail.jpg',
+      instructor: instructorUser._id,
+      sections: [
+        { 
+          title: 'Getting Started',
+          lessons: [
+            {
+              title: 'Introduction',
+              description: 'Welcome to the course',
+              videoUrl: 'https://example.com/video1.mp4',
+              duration: '5:00'
+            },
+            {
+              title: 'Setup',
+              description: 'Setting up your environment',
+              videoUrl: 'https://example.com/video2.mp4',
+              duration: '10:00'
+            }
+          ]
+        }
+      ]
+    });
+    
+    courseId = course._id;
+  });
+
+  describe('POST /api/v1/courses/:id/enroll', () => {
+    it('should enroll a user in a course', async () => {
+      const res = await request(app)
+        .post(`/api/v1/courses/${courseId}/enroll`)
+        .set('Authorization', `Bearer ${userToken}`);
+      
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveProperty('success', true);
+
+      // Verify user is enrolled
+      const user = await User.findById(regularUser._id);
+      expect(user.enrolledCourses).toHaveLength(1);
+      expect(user.enrolledCourses[0].course.toString()).toBe(courseId.toString());
+    });
+
+    it('should not allow enrolling in the same course twice', async () => {
+      // First enrollment
+      await request(app)
+        .post(`/api/v1/courses/${courseId}/enroll`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      // Try to enroll again
+      const res = await request(app)
+        .post(`/api/v1/courses/${courseId}/enroll`)
+        .set('Authorization', `Bearer ${userToken}`);
+      
+      expect(res.statusCode).toEqual(400);
+      expect(res.body).toHaveProperty('success', false);
+      expect(res.body.message).toContain('Already enrolled');
+    });
+  });
+
+  describe('GET /api/v1/courses/enrolled', () => {
+    it('should get all courses enrolled by the user', async () => {
+      // Enroll user in the course
+      await request(app)
+        .post(`/api/v1/courses/${courseId}/enroll`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      // Get enrolled courses
+      const res = await request(app)
+        .get('/api/v1/courses/enrolled')
+        .set('Authorization', `Bearer ${userToken}`);
+      
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveProperty('success', true);
+      expect(res.body).toHaveProperty('count', 1);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0]).toHaveProperty('title', 'Enrollment Test Course');
+      expect(res.body.data[0]).toHaveProperty('progress', 0);
+      expect(res.body.data[0]).toHaveProperty('completed', false);
+      expect(res.body.data[0]).toHaveProperty('enrolledAt');
+      expect(res.body.data[0]).toHaveProperty('completedLessons');
+    });
+
+    it('should get enrolled courses using query parameter', async () => {
+      // Enroll user in the course
+      await request(app)
+        .post(`/api/v1/courses/${courseId}/enroll`)
+        .set('Authorization', `Bearer ${userToken}`);
+
+      // Get enrolled courses using query parameter
+      const res = await request(app)
+        .get('/api/v1/courses?enrolled=true')
+        .set('Authorization', `Bearer ${userToken}`);
+      
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveProperty('success', true);
+      expect(res.body).toHaveProperty('count', 1);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0]).toHaveProperty('title', 'Enrollment Test Course');
+      expect(res.body.data[0]).toHaveProperty('progress', 0);
+      expect(res.body.data[0]).toHaveProperty('completed', false);
+    });
+
+    it('should return empty array if user has not enrolled in any courses', async () => {
+      const res = await request(app)
+        .get('/api/v1/courses/enrolled')
+        .set('Authorization', `Bearer ${userToken}`);
+      
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveProperty('success', true);
+      expect(res.body).toHaveProperty('count', 0);
+      expect(res.body.data).toHaveLength(0);
+    });
+
+    it('should return empty array if user has not enrolled in any courses using query parameter', async () => {
+      const res = await request(app)
+        .get('/api/v1/courses?enrolled=true')
+        .set('Authorization', `Bearer ${userToken}`);
+      
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveProperty('success', true);
+      expect(res.body.data).toHaveLength(0);
+    });
+
+    it('should require authentication', async () => {
+      const res = await request(app)
+        .get('/api/v1/courses/enrolled');
+      
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toHaveProperty('success', false);
+    });
+
+    it('should require authentication when using query parameter', async () => {
+      const res = await request(app)
+        .get('/api/v1/courses?enrolled=true');
+      
+      expect(res.statusCode).toEqual(401);
+      expect(res.body).toHaveProperty('success', false);
+    });
+  });
+
+  describe('PUT /api/v1/courses/:id/progress', () => {
+    // ... existing progress test cases if any ...
+  });
+});

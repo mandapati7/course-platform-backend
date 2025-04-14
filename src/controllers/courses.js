@@ -7,11 +7,19 @@ const ErrorResponse = require('../utils/errorResponse');
 // @route   GET /api/v1/courses
 // @access  Public
 exports.getCourses = asyncHandler(async (req, res, next) => {
+  // Check if we should return enrolled courses
+  if (req.query.enrolled === 'true') {
+    // For the enrolled parameter we need to verify authentication first
+    // Instead of handling authentication here, pass it to the protect middleware
+    // and let getEnrolledCourses handle the actual data fetching
+    return next();
+  }
+
   // Copy req.query
   const reqQuery = { ...req.query };
 
   // Fields to exclude
-  const removeFields = ['select', 'sort', 'page', 'limit', 'keyword'];
+  const removeFields = ['select', 'sort', 'page', 'limit', 'keyword', 'enrolled'];
 
   // Loop over removeFields and delete them from reqQuery
   removeFields.forEach(param => delete reqQuery[param]);
@@ -249,6 +257,42 @@ exports.enrollCourse = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     data: {}
+  });
+});
+
+// @desc    Get enrolled courses for current user
+// @route   GET /api/v1/courses/enrolled
+// @access  Private
+exports.getEnrolledCourses = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user.id)
+    .populate({
+      path: 'enrolledCourses.course',
+      select: 'title description thumbnail instructor rating averageRating sections',
+      populate: {
+        path: 'instructor',
+        select: 'name profileImage'
+      }
+    });
+
+  if (!user) {
+    return next(new ErrorResponse('User not found', 404));
+  }
+
+  // Format the response data
+  const enrolledCourses = user.enrolledCourses.map(enrollment => {
+    return {
+      ...enrollment.course.toObject(),
+      progress: enrollment.progress,
+      completed: enrollment.completed,
+      enrolledAt: enrollment.enrolledAt,
+      completedLessons: enrollment.completedLessons
+    };
+  });
+
+  res.status(200).json({
+    success: true,
+    count: enrolledCourses.length,
+    data: enrolledCourses
   });
 });
 

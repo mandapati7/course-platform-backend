@@ -336,6 +336,91 @@ DELETE /courses/:id
 }
 ```
 
+#### Get Enrolled Courses
+
+```
+GET /courses/enrolled
+```
+
+**Description:**
+Retrieves all courses that the current authenticated user is enrolled in, along with enrollment details like progress, completion status and completed lessons.
+
+**Authentication Required:** Yes
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 2,
+  "data": [
+    {
+      "_id": "60d21b4667d0d8992e610c85",
+      "title": "React Fundamentals",
+      "description": "Learn the basics of React",
+      "thumbnail": "https://example.com/thumbnails/react.jpg",
+      "instructor": {
+        "_id": "60d21b4667d0d8992e610c85",
+        "name": "John Doe",
+        "profileImage": "https://example.com/profiles/johndoe.jpg"
+      },
+      "averageRating": 4.5,
+      "sections": [
+        {
+          "_id": "60d21b4667d0d8992e610c87",
+          "title": "Getting Started",
+          "lessons": [
+            {
+              "_id": "60d21b4667d0d8992e610c88",
+              "title": "Introduction to React"
+            },
+            {
+              "_id": "60d21b4667d0d8992e610c89",
+              "title": "Setting Up Your Development Environment"
+            }
+          ]
+        }
+      ],
+      "progress": 50,
+      "completed": false,
+      "enrolledAt": "2025-04-01T12:00:00.000Z",
+      "completedLessons": ["60d21b4667d0d8992e610c88"]
+    },
+    {
+      "_id": "60d21b4667d0d8992e610c86",
+      "title": "JavaScript Basics",
+      "description": "Learn JavaScript from scratch",
+      "thumbnail": "https://example.com/thumbnails/javascript.jpg",
+      "instructor": {
+        "_id": "60d21b4667d0d8992e610c86",
+        "name": "Jane Smith",
+        "profileImage": "https://example.com/profiles/janesmith.jpg"
+      },
+      "averageRating": 4.7,
+      "sections": [
+        {
+          "_id": "60d21b4667d0d8992e610c90",
+          "title": "JavaScript Fundamentals",
+          "lessons": [
+            {
+              "_id": "60d21b4667d0d8992e610c91",
+              "title": "Variables and Data Types"
+            },
+            {
+              "_id": "60d21b4667d0d8992e610c92",
+              "title": "Functions and Scope"
+            }
+          ]
+        }
+      ],
+      "progress": 100,
+      "completed": true,
+      "enrolledAt": "2025-03-15T12:00:00.000Z",
+      "completedLessons": ["60d21b4667d0d8992e610c91", "60d21b4667d0d8992e610c92"]
+    }
+  ]
+}
+```
+
 ## Sections
 
 ### Add Section to Course
