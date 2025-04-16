@@ -8,6 +8,7 @@ const ErrorResponse = require('../utils/errorResponse');
 // Initialize Stripe only if secret key is available
 let stripe;
 if (process.env.STRIPE_SECRET_KEY) {
+  console.log('Using Stripe key:', process.env.STRIPE_SECRET_KEY.substring(0, 8) + '...');
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
@@ -29,7 +30,7 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
   // Check if user is already enrolled
   const user = await User.findById(req.user.id);
   const alreadyEnrolled = user.enrolledCourses && user.enrolledCourses.some(
-    enrolledCourse => enrolledCourse.course.toString() === courseId
+    enrolledCourse => enrolledCourse.course && enrolledCourse.course.toString() === courseId
   );
 
   if (alreadyEnrolled) {
@@ -41,19 +42,26 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
   try {
     let paymentStatus = 'pending';
     let paymentIntentId = 'test_payment_id';
-
+    console.log(`*************** NODE_ENV: ${process.env.NODE_ENV} ***************`);
     if (process.env.NODE_ENV !== 'test') {
       if (!stripe) {
         return next(new ErrorResponse('Stripe payments are not configured', 501));
       }
 
-      // Create payment intent
+      // Create payment intent with updated configuration
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(course.price * 100),
         currency: 'usd',
         payment_method: paymentMethodId,
         confirm: true,
-        description: `Enrollment in course: ${course.title}`,
+        // Either provide a return_url
+        return_url: `${process.env.CLIENT_URL}/payment-success`,
+        // Or disable redirect-based methods
+        automatic_payment_methods: {
+          enabled: true,
+          allow_redirects: 'never'
+        },
+        description: `Enrollment in course: ${course.title}, for user (${req.user.id})`,
         metadata: {
           courseId,
           userId: req.user.id
@@ -106,7 +114,7 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
         type: 'payment',
         title: 'Course Enrollment Successful',
         message: 'Payment successful',
-        details: `You have successfully enrolled in ${course.title}`,
+        details: `You (${req.user.id}) have successfully enrolled in ${course.title}`,
         actionLink: `/courses/${courseId}`,
         actionText: 'Start Learning'
       });

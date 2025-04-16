@@ -229,8 +229,15 @@ exports.enrollCourse = asyncHandler(async (req, res, next) => {
 
   // Check if user is already enrolled
   const user = await User.findById(req.user.id);
+  
+  // First check if enrolledCourses exists and has items
+  if (!user) {
+    return next(new ErrorResponse('User not found', 404));
+  }
+  
+  // Add null/undefined check before accessing course.toString()
   const alreadyEnrolled = user.enrolledCourses.some(
-    enrolledCourse => enrolledCourse.course.toString() === req.params.id
+    enrolledCourse => enrolledCourse.course && enrolledCourse.course.toString() === req.params.id
   );
 
   if (alreadyEnrolled) {
@@ -278,16 +285,18 @@ exports.getEnrolledCourses = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('User not found', 404));
   }
 
-  // Format the response data
-  const enrolledCourses = user.enrolledCourses.map(enrollment => {
-    return {
-      ...enrollment.course.toObject(),
-      progress: enrollment.progress,
-      completed: enrollment.completed,
-      enrolledAt: enrollment.enrolledAt,
-      completedLessons: enrollment.completedLessons
-    };
-  });
+  // Format the response data with null check
+  const enrolledCourses = user.enrolledCourses
+    .filter(enrollment => enrollment.course) // Filter out any null/undefined courses
+    .map(enrollment => {
+      return {
+        ...enrollment.course.toObject(),
+        progress: enrollment.progress,
+        completed: enrollment.completed,
+        enrolledAt: enrollment.enrolledAt,
+        completedLessons: enrollment.completedLessons
+      };
+    });
 
   res.status(200).json({
     success: true,
@@ -310,8 +319,14 @@ exports.addReview = asyncHandler(async (req, res, next) => {
 
   // Check if user is enrolled in the course
   const user = await User.findById(req.user.id);
+  
+  if (!user) {
+    return next(new ErrorResponse('User not found', 404));
+  }
+
+  // Add null check similar to the enrollCourse function
   const isEnrolled = user.enrolledCourses.some(
-    enrolledCourse => enrolledCourse.course.toString() === req.params.id
+    enrolledCourse => enrolledCourse.course && enrolledCourse.course.toString() === req.params.id
   );
 
   if (!isEnrolled && req.user.role !== 'admin') {
@@ -325,7 +340,7 @@ exports.addReview = asyncHandler(async (req, res, next) => {
 
   // Check if user already reviewed this course
   const alreadyReviewed = course.reviews.some(
-    review => review.user.toString() === req.user.id
+    review => review.user && review.user.toString() === req.user.id
   );
 
   if (alreadyReviewed) {
