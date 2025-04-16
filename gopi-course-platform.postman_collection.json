@@ -839,6 +839,170 @@
 					}
 				}
 			]
+		},
+		{
+			"name": "Videos",
+			"item": [
+				{
+					"name": "Generate Upload Ticket",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Sample Video Lesson\",\n    \"description\": \"This is a sample video for testing the Vimeo integration\",\n    \"fileSize\": 10485760\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/videos/upload-ticket/:courseId/:sectionIndex/:lessonIndex",
+							"host": ["{{base_url}}"],
+							"path": ["videos", "upload-ticket", ":courseId", ":sectionIndex", ":lessonIndex"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here",
+									"description": "ID of the course"
+								},
+								{
+									"key": "sectionIndex",
+									"value": "0",
+									"description": "Index of the section (zero-based)"
+								},
+								{
+									"key": "lessonIndex",
+									"value": "0",
+									"description": "Index of the lesson (zero-based)"
+								}
+							]
+						},
+						"description": "Generate a Vimeo upload ticket for direct-to-Vimeo uploads. This endpoint returns an upload URL that can be used to upload a video file directly to Vimeo from the client. The fileSize parameter should be the size of the video file in bytes."
+					}
+				},
+				{
+					"name": "Confirm Upload Complete",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/videos/confirm-upload/:courseId/:sectionIndex/:lessonIndex",
+							"host": ["{{base_url}}"],
+							"path": ["videos", "confirm-upload", ":courseId", ":sectionIndex", ":lessonIndex"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here",
+									"description": "ID of the course"
+								},
+								{
+									"key": "sectionIndex",
+									"value": "0",
+									"description": "Index of the section (zero-based)"
+								},
+								{
+									"key": "lessonIndex",
+									"value": "0",
+									"description": "Index of the lesson (zero-based)"
+								}
+							]
+						},
+						"description": "Confirm that a video upload to Vimeo is complete. This updates the lesson with video details from Vimeo, such as thumbnail, duration, etc. Call this endpoint after the client has finished uploading the video to the URL provided by the upload-ticket endpoint."
+					}
+				},
+				{
+					"name": "Get Video Playback",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/videos/playback/:courseId/:sectionIndex/:lessonIndex",
+							"host": ["{{base_url}}"],
+							"path": ["videos", "playback", ":courseId", ":sectionIndex", ":lessonIndex"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here",
+									"description": "ID of the course"
+								},
+								{
+									"key": "sectionIndex",
+									"value": "0",
+									"description": "Index of the section (zero-based)"
+								},
+								{
+									"key": "lessonIndex",
+									"value": "0",
+									"description": "Index of the lesson (zero-based)"
+								}
+							]
+						},
+						"description": "Get video playback details for a lesson. This endpoint returns the video embed URL and HTML, which can be used to display the video in the client application. The user must be enrolled in the course (or the video must be marked as a preview) to access this endpoint."
+					}
+				},
+				{
+					"name": "Toggle Preview Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/videos/toggle-preview/:courseId/:sectionIndex/:lessonIndex",
+							"host": ["{{base_url}}"],
+							"path": ["videos", "toggle-preview", ":courseId", ":sectionIndex", ":lessonIndex"],
+							"variable": [
+								{
+									"key": "courseId",
+									"value": "course_id_here",
+									"description": "ID of the course"
+								},
+								{
+									"key": "sectionIndex",
+									"value": "0",
+									"description": "Index of the section (zero-based)"
+								},
+								{
+									"key": "lessonIndex",
+									"value": "0",
+									"description": "Index of the lesson (zero-based)"
+								}
+							]
+						},
+						"description": "Toggle the preview status of a video lesson. Preview videos are publicly accessible, while non-preview videos are only accessible to enrolled users. This endpoint also updates the privacy settings on Vimeo accordingly."
+					}
+				}
+			],
+			"description": "Endpoints for managing video content with Vimeo integration. These endpoints handle video uploads, playback, and preview settings."
 		}
 	]
 }

@@ -1,15 +1,18 @@
-const Payment = require('../models/Payment');
-const Course = require('../models/Course');
-const User = require('../models/User');
-const Notification = require('../models/Notification');
-const asyncHandler = require('../middleware/async');
-const ErrorResponse = require('../utils/errorResponse');
+const Payment = require("../models/Payment");
+const Course = require("../models/Course");
+const User = require("../models/User");
+const Notification = require("../models/Notification");
+const asyncHandler = require("../middleware/async");
+const ErrorResponse = require("../utils/errorResponse");
 
 // Initialize Stripe only if secret key is available
 let stripe;
 if (process.env.STRIPE_SECRET_KEY) {
-  console.log('Using Stripe key:', process.env.STRIPE_SECRET_KEY.substring(0, 8) + '...');
-  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  console.log(
+    "Using Stripe key:",
+    process.env.STRIPE_SECRET_KEY.substring(0, 8) + "..."
+  );
+  stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 }
 
 // @desc    Process payment with Stripe
@@ -29,9 +32,12 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
 
   // Check if user is already enrolled
   const user = await User.findById(req.user.id);
-  const alreadyEnrolled = user.enrolledCourses && user.enrolledCourses.some(
-    enrolledCourse => enrolledCourse.course && enrolledCourse.course.toString() === courseId
-  );
+  const alreadyEnrolled =
+    user.enrolledCourses &&
+    user.enrolledCourses.some(
+      (enrolledCourse) =>
+        enrolledCourse.course && enrolledCourse.course.toString() === courseId
+    );
 
   if (alreadyEnrolled) {
     return next(
@@ -40,18 +46,22 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    let paymentStatus = 'pending';
-    let paymentIntentId = 'test_payment_id';
-    console.log(`*************** NODE_ENV: ${process.env.NODE_ENV} ***************`);
-    if (process.env.NODE_ENV !== 'test') {
+    let paymentStatus = "pending";
+    let paymentIntentId = "test_payment_id";
+    console.log(
+      `*************** NODE_ENV: ${process.env.NODE_ENV} ***************`
+    );
+    if (process.env.NODE_ENV !== "test") {
       if (!stripe) {
-        return next(new ErrorResponse('Stripe payments are not configured', 501));
+        return next(
+          new ErrorResponse("Stripe payments are not configured", 501)
+        );
       }
 
       // Create payment intent with updated configuration
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(course.price * 100),
-        currency: 'usd',
+        currency: "usd",
         payment_method: paymentMethodId,
         confirm: true,
         // Either provide a return_url
@@ -59,20 +69,21 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
         // Or disable redirect-based methods
         automatic_payment_methods: {
           enabled: true,
-          allow_redirects: 'never'
+          allow_redirects: "never",
         },
         description: `Enrollment in course: ${course.title}, for user (${req.user.id})`,
         metadata: {
           courseId,
-          userId: req.user.id
-        }
+          userId: req.user.id,
+        },
       });
 
-      paymentStatus = paymentIntent.status === 'succeeded' ? 'completed' : 'pending';
+      paymentStatus =
+        paymentIntent.status === "succeeded" ? "completed" : "pending";
       paymentIntentId = paymentIntent.id;
     } else {
       // In test mode, always simulate successful payment
-      paymentStatus = 'completed';
+      paymentStatus = "completed";
     }
 
     // Create payment record
@@ -80,14 +91,14 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
       user: req.user.id,
       course: courseId,
       amount: course.price,
-      paymentMethod: 'credit_card',
+      paymentMethod: "credit_card",
       paymentId: paymentIntentId,
       status: paymentStatus,
-      transactionDetails: { id: paymentIntentId }
+      transactionDetails: { id: paymentIntentId },
     });
 
     // If payment succeeded, enroll user in course
-    if (paymentStatus === 'completed') {
+    if (paymentStatus === "completed") {
       // Initialize enrolledCourses array if it doesn't exist
       if (!user.enrolledCourses) {
         user.enrolledCourses = [];
@@ -99,7 +110,7 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
         enrolledAt: Date.now(),
         progress: 0,
         completed: false,
-        completedLessons: []
+        completedLessons: [],
       });
 
       await user.save();
@@ -111,12 +122,12 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
       // Create notification
       await Notification.create({
         user: req.user.id,
-        type: 'payment',
-        title: 'Course Enrollment Successful',
-        message: 'Payment successful',
+        type: "payment",
+        title: "Course Enrollment Successful",
+        message: "Payment successful",
         details: `You (${req.user.id}) have successfully enrolled in ${course.title}`,
         actionLink: `/courses/${courseId}`,
-        actionText: 'Start Learning'
+        actionText: "Start Learning",
       });
     }
 
@@ -124,13 +135,11 @@ exports.processStripePayment = asyncHandler(async (req, res, next) => {
       success: true,
       data: {
         paymentId: payment._id,
-        status: payment.status
-      }
+        status: payment.status,
+      },
     });
   } catch (error) {
-    return next(
-      new ErrorResponse(`Payment failed: ${error.message}`, 400)
-    );
+    return next(new ErrorResponse(`Payment failed: ${error.message}`, 400));
   }
 });
 
@@ -151,9 +160,11 @@ exports.processPayPalPayment = asyncHandler(async (req, res, next) => {
 
   // Check if user is already enrolled
   const user = await User.findById(req.user.id);
-  const alreadyEnrolled = user.enrolledCourses && user.enrolledCourses.some(
-    enrolledCourse => enrolledCourse.course.toString() === courseId
-  );
+  const alreadyEnrolled =
+    user.enrolledCourses &&
+    user.enrolledCourses.some(
+      (enrolledCourse) => enrolledCourse.course.toString() === courseId
+    );
 
   if (alreadyEnrolled) {
     return next(
@@ -169,10 +180,10 @@ exports.processPayPalPayment = asyncHandler(async (req, res, next) => {
     user: req.user.id,
     course: courseId,
     amount: course.price,
-    paymentMethod: 'paypal',
+    paymentMethod: "paypal",
     paymentId: paypalOrderId,
-    status: 'completed',
-    transactionDetails: { orderId: paypalOrderId }
+    status: "completed",
+    transactionDetails: { orderId: paypalOrderId },
   });
 
   // Initialize enrolledCourses array if it doesn't exist
@@ -186,7 +197,7 @@ exports.processPayPalPayment = asyncHandler(async (req, res, next) => {
     enrolledAt: Date.now(),
     progress: 0,
     completed: false,
-    completedLessons: []
+    completedLessons: [],
   });
 
   await user.save();
@@ -198,20 +209,20 @@ exports.processPayPalPayment = asyncHandler(async (req, res, next) => {
   // Create notification
   await Notification.create({
     user: req.user.id,
-    type: 'payment',
-    title: 'Course Enrollment Successful',
-    message: 'Payment successful',
+    type: "payment",
+    title: "Course Enrollment Successful",
+    message: "Payment successful",
     details: `You have successfully enrolled in ${course.title}`,
     actionLink: `/courses/${courseId}`,
-    actionText: 'Start Learning'
+    actionText: "Start Learning",
   });
 
   res.status(200).json({
     success: true,
     data: {
       paymentId: payment._id,
-      status: payment.status
-    }
+      status: payment.status,
+    },
   });
 });
 
@@ -221,15 +232,15 @@ exports.processPayPalPayment = asyncHandler(async (req, res, next) => {
 exports.getPaymentHistory = asyncHandler(async (req, res, next) => {
   const payments = await Payment.find({ user: req.user.id })
     .populate({
-      path: 'course',
-      select: 'title thumbnail'
+      path: "course",
+      select: "title thumbnail",
     })
-    .sort('-createdAt');
+    .sort("-createdAt");
 
   res.status(200).json({
     success: true,
     count: payments.length,
-    data: payments
+    data: payments,
   });
 });
 
@@ -239,12 +250,12 @@ exports.getPaymentHistory = asyncHandler(async (req, res, next) => {
 exports.getPaymentDetails = asyncHandler(async (req, res, next) => {
   const payment = await Payment.findById(req.params.id)
     .populate({
-      path: 'course',
-      select: 'title thumbnail price'
+      path: "course",
+      select: "title thumbnail price",
     })
     .populate({
-      path: 'user',
-      select: 'name email'
+      path: "user",
+      select: "name email",
     });
 
   if (!payment) {
@@ -254,7 +265,10 @@ exports.getPaymentDetails = asyncHandler(async (req, res, next) => {
   }
 
   // Make sure user owns the payment or is admin
-  if (payment.user._id.toString() !== req.user.id && req.user.role !== 'admin') {
+  if (
+    payment.user._id.toString() !== req.user.id &&
+    req.user.role !== "admin"
+  ) {
     return next(
       new ErrorResponse(`Not authorized to access this payment`, 403)
     );
@@ -262,6 +276,6 @@ exports.getPaymentDetails = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    data: payment
+    data: payment,
   });
 });
