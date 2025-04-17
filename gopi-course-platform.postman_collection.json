@@ -1000,9 +1000,247 @@
 						},
 						"description": "Toggle the preview status of a video lesson. Preview videos are publicly accessible, while non-preview videos are only accessible to enrolled users. This endpoint also updates the privacy settings on Vimeo accordingly."
 					}
+				},
+				{
+					"name": "Get Video Progress",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has correct structure\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('currentTime');",
+									"    pm.expect(jsonData.data).to.have.property('duration');",
+									"    pm.expect(jsonData.data).to.have.property('timestamp');",
+									"    pm.expect(jsonData.data).to.have.property('completed');",
+									"    pm.expect(jsonData.data).to.have.property('percent');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/videos/:videoId/progress",
+							"host": ["{{base_url}}"],
+							"path": ["videos", ":videoId", "progress"],
+							"variable": [
+								{
+									"key": "videoId",
+									"value": "vimeo_12345678",
+									"description": "ID of the video in format: vimeo_12345678, youtube_abcd1234, or url_[encoded-url]"
+								}
+							]
+						},
+						"description": "Retrieve saved video progress for a specific video. Returns the last saved position, duration, completion percentage, and timestamp of when progress was last saved. If no progress exists for the video, it returns default values with 0% completion."
+					}
+				},
+				{
+					"name": "Save Video Progress",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has correct structure\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(true);",
+									"    pm.expect(jsonData.data).to.have.property('currentTime');",
+									"    pm.expect(jsonData.data).to.have.property('duration');",
+									"    pm.expect(jsonData.data).to.have.property('timestamp');",
+									"    pm.expect(jsonData.data).to.have.property('completed');",
+									"    pm.expect(jsonData.data).to.have.property('percent');",
+									"});",
+									"",
+									"pm.test(\"Saved values match sent values\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    var requestBody = JSON.parse(pm.request.body.raw);",
+									"    pm.expect(jsonData.data.currentTime).to.eql(requestBody.currentTime);",
+									"    pm.expect(jsonData.data.duration).to.eql(requestBody.duration);",
+									"    pm.expect(jsonData.data.completed).to.eql(requestBody.completed);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"currentTime\": 120.5,\n    \"duration\": 360.0,\n    \"lessonId\": \"lesson123\",\n    \"courseId\": \"course456\",\n    \"timestamp\": {{$timestamp}},\n    \"completed\": false\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/videos/:videoId/progress",
+							"host": ["{{base_url}}"],
+							"path": ["videos", ":videoId", "progress"],
+							"variable": [
+								{
+									"key": "videoId",
+									"value": "vimeo_12345678",
+									"description": "ID of the video in format: vimeo_12345678, youtube_abcd1234, or url_[encoded-url]"
+								}
+							]
+						},
+						"description": "Save or update the playback progress for a specific video. Stores the current playback position, duration, and completion status. The system uses an upsert operation, so it will create a new progress record if one doesn't exist, or update the existing record if it does. This endpoint is optimized for frequent calls as users watch videos."
+					}
+				},
+				{
+					"name": "Save Video Progress - Mark Completed",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Video is marked as completed\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data.completed).to.eql(true);",
+									"    pm.expect(jsonData.data.percent).to.eql(100);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"currentTime\": 360.0,\n    \"duration\": 360.0,\n    \"lessonId\": \"lesson123\",\n    \"courseId\": \"course456\",\n    \"timestamp\": {{$timestamp}},\n    \"completed\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/videos/:videoId/progress",
+							"host": ["{{base_url}}"],
+							"path": ["videos", ":videoId", "progress"],
+							"variable": [
+								{
+									"key": "videoId",
+									"value": "vimeo_12345678",
+									"description": "ID of the video in format: vimeo_12345678, youtube_abcd1234, or url_[encoded-url]"
+								}
+							]
+						},
+						"description": "Mark a video as completed by sending a progress update with completed=true and currentTime equal to the full duration. This can be used when a user has finished watching a video."
+					}
+				},
+				{
+					"name": "Save Video Progress - Missing Required Fields",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test(\"Error message indicates missing fields\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.success).to.eql(false);",
+									"    pm.expect(jsonData.error).to.include('required');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"lessonId\": \"lesson123\",\n    \"courseId\": \"course456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/videos/:videoId/progress",
+							"host": ["{{base_url}}"],
+							"path": ["videos", ":videoId", "progress"],
+							"variable": [
+								{
+									"key": "videoId",
+									"value": "vimeo_12345678",
+									"description": "ID of the video in format: vimeo_12345678, youtube_abcd1234, or url_[encoded-url]"
+								}
+							]
+						},
+						"description": "Test case for error handling when required fields (currentTime and duration) are missing."
+					}
 				}
 			],
-			"description": "Endpoints for managing video content with Vimeo integration. These endpoints handle video uploads, playback, and preview settings."
+			"description": "Endpoints for managing video content with Vimeo integration. These endpoints handle video uploads, playback, preview settings, and video progress tracking."
 		}
 	]
 }
