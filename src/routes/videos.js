@@ -4,6 +4,8 @@ const {
   confirmVideoUpload,
   getVideoPlayback,
   togglePreview,
+  getVideoProgress,
+  saveVideoProgress
 } = require("../controllers/videos");
 
 const router = express.Router();
@@ -37,6 +39,19 @@ router.get(
   "/playback/:courseId/:sectionIndex/:lessonIndex",
   protect,
   getVideoPlayback
+);
+
+// Video progress tracking routes
+router.get(
+  "/:videoId/progress",
+  protect,
+  getVideoProgress
+);
+
+router.post(
+  "/:videoId/progress",
+  protect,
+  saveVideoProgress
 );
 
 module.exports = router;

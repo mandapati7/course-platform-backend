@@ -1,5 +1,6 @@
 const Course = require("../models/Course");
 const User = require("../models/User");
+const VideoProgress = require("../models/VideoProgress");
 const asyncHandler = require("../middleware/async");
 const ErrorResponse = require("../utils/errorResponse");
 const vimeoService = require("../utils/vimeoService");
@@ -205,26 +206,44 @@ exports.getVideoPlayback = asyncHandler(async (req, res, next) => {
     if (!isEnrolled) {
       return next(new ErrorResponse("Not enrolled in this course", 403));
     }
-
-    // Mark as started for progress tracking if enrolled
-    // This would be expanded in a real implementation
   }
 
   // Get fresh video details from Vimeo
   try {
     const videoDetails = await vimeoService.getVideoDetails(lesson.videoId);
+    
+    // Fetch saved progress for this video
+    // Format video ID as expected by progress tracking (vimeo_ID)
+    const formattedVideoId = `vimeo_${lesson.videoId}`;
+    const progress = await VideoProgress.findOne({
+      userId: req.user.id,
+      videoId: formattedVideoId
+    });
+    
+    // Prepare response data
+    const responseData = {
+      videoId: lesson.videoId,
+      embedUrl: videoDetails.player_embed_url,
+      htmlEmbed: videoDetails.embed?.html,
+      title: lesson.title,
+      description: lesson.description,
+      duration: lesson.duration,
+      thumbnailUrl: lesson.thumbnailUrl,
+      // Include progress data
+      progress: {
+        currentTime: progress ? progress.currentTime : 0,
+        duration: progress ? progress.duration : 0,
+        percent: progress && progress.duration > 0 
+          ? Math.min(Math.round((progress.currentTime / progress.duration) * 100 * 10) / 10, 100)
+          : 0,
+        completed: progress ? progress.completed : false,
+        timestamp: progress ? progress.timestamp : null
+      }
+    };
 
     res.status(200).json({
       success: true,
-      data: {
-        videoId: lesson.videoId,
-        embedUrl: videoDetails.player_embed_url,
-        htmlEmbed: videoDetails.embed?.html,
-        title: lesson.title,
-        description: lesson.description,
-        duration: lesson.duration,
-        thumbnailUrl: lesson.thumbnailUrl,
-      },
+      data: responseData
     });
   } catch (error) {
     return next(
@@ -280,5 +299,92 @@ exports.togglePreview = asyncHandler(async (req, res, next) => {
     data: {
       isPreview: lesson.isPreview,
     },
+  });
+});
+
+// @desc    Get video progress for a specific video
+// @route   GET /api/v1/videos/:videoId/progress
+// @access  Private
+exports.getVideoProgress = asyncHandler(async (req, res, next) => {
+  const { videoId } = req.params;
+  
+  // Find progress record for this user and video
+  const progress = await VideoProgress.findOne({
+    userId: req.user.id,
+    videoId: videoId
+  });
+  
+  if (!progress) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        currentTime: 0,
+        duration: 0,
+        timestamp: Date.now(),
+        completed: false,
+        percent: 0
+      }
+    });
+  }
+  
+  // Calculate percentage completed
+  const percent = progress.duration > 0 
+    ? Math.min(Math.round((progress.currentTime / progress.duration) * 100 * 10) / 10, 100) 
+    : 0;
+  
+  res.status(200).json({
+    success: true,
+    data: {
+      currentTime: progress.currentTime,
+      duration: progress.duration,
+      timestamp: progress.timestamp,
+      completed: progress.completed,
+      percent: percent,
+      lessonId: progress.lessonId,
+      courseId: progress.courseId
+    }
+  });
+});
+
+// @desc    Save or update video progress
+// @route   POST /api/v1/videos/:videoId/progress
+// @access  Private
+exports.saveVideoProgress = asyncHandler(async (req, res, next) => {
+  const { videoId } = req.params;
+  const { currentTime, duration, lessonId, courseId, timestamp, completed } = req.body;
+  
+  // Validate required fields
+  if (currentTime === undefined || duration === undefined) {
+    return next(new ErrorResponse("Current time and duration are required", 400));
+  }
+  
+  // Find existing progress or create new one (upsert)
+  const progress = await VideoProgress.findOneAndUpdate(
+    { userId: req.user.id, videoId: videoId },
+    {
+      currentTime,
+      duration,
+      lessonId,
+      courseId,
+      timestamp: timestamp || Date.now(),
+      completed: completed || false
+    },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
+  
+  // Calculate percentage completed
+  const percent = duration > 0 
+    ? Math.min(Math.round((currentTime / duration) * 100 * 10) / 10, 100) 
+    : 0;
+  
+  res.status(200).json({
+    success: true,
+    data: {
+      currentTime: progress.currentTime,
+      duration: progress.duration,
+      timestamp: progress.timestamp,
+      completed: progress.completed,
+      percent: percent
+    }
   });
 });
