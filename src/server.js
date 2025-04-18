@@ -1,6 +1,20 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
+// Add timestamp to console logs
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+
+console.log = function() {
+  const timestamp = new Date().toISOString();
+  originalConsoleLog.apply(console, [`[${timestamp}]`, ...arguments]);
+};
+
+console.error = function() {
+  const timestamp = new Date().toISOString();
+  originalConsoleError.apply(console, [`[${timestamp}] ERROR:`, ...arguments]);
+};
+
 // Construct the env file path
 const envFile = `.env.${process.env.NODE_ENV}`;
 const envPath = path.resolve(process.cwd(), envFile);
