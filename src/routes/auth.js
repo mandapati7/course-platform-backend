@@ -12,14 +12,14 @@ const {
 } = require('../controllers/auth');
 
 const router = express.Router();
+const logger = require('../utils/logger');
 
 // Route logging middleware
 router.use((req, res, next) => {
-  console.log('\n=== Auth Route Hit ===');
-  console.log('Time:', Date.now());
-  console.log('Method:', req.method);
-  console.log('Path:', req.path);
-  console.log('Headers:', req.headers);
+  logger.security(`Auth route accessed: ${req.method} ${req.path}`, {
+    userId: req.user ? req.user.id : 'unauthenticated',
+    ip: req.headers['x-forwarded-for'] || req.connection.remoteAddress
+  });
   next();
 });
 

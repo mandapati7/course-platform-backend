@@ -8,3 +8,7 @@
 backend/package-lock.json
 
 coverage/*
+logs/
+logs/*
+
+  

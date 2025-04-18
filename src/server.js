@@ -1,27 +1,11 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-// Add timestamp to console logs
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-
-console.log = function() {
-  const timestamp = new Date().toISOString();
-  originalConsoleLog.apply(console, [`[${timestamp}]`, ...arguments]);
-};
-
-console.error = function() {
-  const timestamp = new Date().toISOString();
-  originalConsoleError.apply(console, [`[${timestamp}] ERROR:`, ...arguments]);
-};
-
 // Construct the env file path
 const envFile = `.env.${process.env.NODE_ENV}`;
 const envPath = path.resolve(process.cwd(), envFile);
 
-console.log(`Looking for environment file: ${envPath}`);
-
-// Load env file
+// Load env file first (before importing logger)
 const result = dotenv.config({
   path: envPath,
 });
@@ -31,9 +15,13 @@ if (result.error) {
   process.exit(1);
 }
 
-console.log(`Successfully loaded environment from: ${envFile}`);
-console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-console.log(`PORT: ${process.env.PORT}`);
+// Import the logger after loading environment variables
+const logger = require('./utils/logger');
+
+logger.info(`Looking for environment file: ${envPath}`);
+logger.info(`Successfully loaded environment from: ${envFile}`);
+logger.info(`NODE_ENV: ${process.env.NODE_ENV}`);
+logger.info(`PORT: ${process.env.PORT}`);
 
 const express = require("express");
 const mongoose = require("mongoose");
@@ -47,61 +35,34 @@ const authRoutes = require("./routes/auth");
 const courseRoutes = require("./routes/courses");
 const paymentRoutes = require("./routes/payments");
 const notificationRoutes = require("./routes/notifications");
-const videoRoutes = require("./routes/videos"); // Add video routes
+const videoRoutes = require("./routes/videos");
 
 // Connect to database
 connectDB();
 
 const app = express();
 
-// Application-level request logging
+// Application-level request logging middleware
 app.use((req, res, next) => {
-  console.log("\n=== Incoming Request ===");
-  console.log(`${req.method} ${req.originalUrl}`);
-  console.log("Headers:", req.headers);
-
-  // Log response
-  const oldWrite = res.write;
-  const oldEnd = res.end;
-
-  const chunks = [];
-
-  res.write = function (chunk) {
-    if (chunk) {
-      // Ensure chunk is a buffer
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return oldWrite.apply(res, arguments);
+  // Log the request when it comes in
+  logger.logRequest(req);
+  
+  // Track response time
+  const startTime = Date.now();
+  
+  // Log response when it goes out
+  const originalEnd = res.end;
+  res.end = function(chunk, encoding) {
+    // Calculate response time
+    const responseTime = Date.now() - startTime;
+    
+    // Call the original end method
+    originalEnd.apply(res, arguments);
+    
+    // Log the response
+    logger.logResponse(req, res, responseTime);
   };
-
-  res.end = function (chunk) {
-    if (chunk) {
-      // Ensure chunk is a buffer
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-
-    console.log("\n=== Response ===");
-    console.log("Status:", res.statusCode);
-
-    try {
-      if (chunks.length > 0) {
-        const body = Buffer.concat(chunks).toString("utf8");
-        console.log(
-          "Body:",
-          body.length > 1000
-            ? body.substring(0, 1000) + "... (truncated)"
-            : body
-        );
-      } else {
-        console.log("Body: <empty>");
-      }
-    } catch (err) {
-      console.log("Error logging response body:", err.message);
-    }
-
-    oldEnd.apply(res, arguments);
-  };
-
+  
   next();
 });
 
@@ -147,15 +108,15 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/courses", courseRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
-app.use("/api/v1/videos", videoRoutes); // Add video routes
+app.use("/api/v1/videos", videoRoutes);
 
 // Error handler middleware
 app.use(errorHandler);
 
-// Explicitly parse port as integer and provide detailed logging
+// Explicitly parse port as integer
 const PORT = parseInt(process.env.PORT, 10);
 if (isNaN(PORT)) {
-  console.error("Invalid PORT in environment variables");
+  logger.error("Invalid PORT in environment variables");
   process.exit(1);
 }
 
@@ -163,28 +124,73 @@ if (isNaN(PORT)) {
 if (process.env.NODE_ENV !== "test") {
   try {
     const server = app.listen(PORT, () => {
-      console.log("\n=== Server Status ===");
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Try accessing: http://localhost:${PORT}/test`);
+      logger.info("=== Server Status ===");
+      logger.info(`Server running on port ${PORT}`);
+      logger.info(`Try accessing: http://localhost:${PORT}/test`);
+      
+      // Apply timeout settings to server
+      server.timeout = 120000; // 2 minute timeout on all requests
+      server.keepAliveTimeout = 60000; // 1 minute keep-alive timeout
+      
+      logger.debug(`Server configured with request timeout: ${server.timeout}ms`);
+      logger.debug(`Server configured with keep-alive timeout: ${server.keepAliveTimeout}ms`);
+    });
+    
+    // Set up server timeout handling
+    server.on('timeout', (socket) => {
+      logger.warn('Connection timeout detected - closing socket to save battery');
+      socket.end();
     });
 
+    // Set up idle connection tracking
+    let idleTimer = null;
+    const IDLE_TIMEOUT = 20 * 60 * 1000; // 20 minutes of inactivity
+    
+    // Function to check if server has been idle too long
+    const checkIdleAndShutdown = () => {
+      logger.info('Server has been idle for too long - entering sleep mode to save battery');
+      // Close all connections but don't shut down the server completely
+      server.getConnections((err, count) => {
+        if (!err) {
+          logger.info(`Closing ${count} idle connections`);
+          // This will make the server reject new connections until activity resumes
+          server.maxConnections = 0;
+          // Reset the server after a period
+          setTimeout(() => {
+            server.maxConnections = Infinity;
+            logger.info('Server exited sleep mode - ready for new connections');
+          }, 10000);
+        }
+      });
+    };
+
+    // Reset idle timer on each request
+    app.use((req, res, next) => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+      }
+      idleTimer = setTimeout(checkIdleAndShutdown, IDLE_TIMEOUT);
+      next();
+    });
+    
+    // Initial idle timer start
+    idleTimer = setTimeout(checkIdleAndShutdown, IDLE_TIMEOUT);
+
     server.on("error", (error) => {
-      console.error("Server startup error:", error);
+      logger.error("Server startup error:", error);
       if (error.code === "EADDRINUSE") {
-        console.error(
-          `Port ${PORT} is already in use. Please try a different port or kill the process using this port.`
-        );
+        logger.error(`Port ${PORT} is already in use. Please try a different port or kill the process using this port.`);
       }
       process.exit(1);
     });
 
     // Handle unhandled promise rejections
     process.on("unhandledRejection", (err, promise) => {
-      console.error("Unhandled Promise Rejection:", err);
+      logger.error("Unhandled Promise Rejection:", err);
       server.close(() => process.exit(1));
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    logger.error("Failed to start server:", error);
     process.exit(1);
   }
 }
