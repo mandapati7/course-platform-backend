@@ -49,25 +49,56 @@ const colors = {
 // Set up log format with colors
 winston.addColors(colors);
 
-// Define the log format
+// Update the consoleFormat to include tracking IDs
 const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
   winston.format.colorize({ all: false }),
   winston.format.printf(info => {
-    const { timestamp, level, message, category = categories.default, ...rest } = info;
-    const categoryStr = category ? `[${category}]` : '';
+    const { timestamp, level, message, category = categories.default, tracking, ...rest } = info;
+    
+    // Format tracking information if present
+    let trackingStr = '';
+    if (tracking) {
+      const { sessionId, requestId, userId } = tracking;
+      if (sessionId || requestId || userId) {
+        trackingStr = `[${sessionId?.substring(0, 8) || '-'}:${requestId?.substring(0, 8) || '-'}:${userId?.substring(0, 8) || '-'}] `;
+      }
+    }
+    
+    const categoryStr = category ? `[${category}] ` : '';
     const restString = Object.keys(rest).length ? JSON.stringify(rest, null, 2) : '';
     
-    // Color the category tag
-    let colorizedCategory = categoryStr;
-    
-    return `[${timestamp}] [${level}] ${colorizedCategory} ${message} ${restString}`;
+    return `[${timestamp}] [${level}] ${categoryStr}${trackingStr}${message} ${restString}`;
   })
 );
 
+// Update the fileFormat to better structure tracking information
 const fileFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
-  winston.format.json()
+  winston.format.printf(info => {
+    // Extract tracking information if present
+    const { tracking, ...rest } = info;
+    const trackingInfo = tracking ? { tracking } : {};
+    
+    // Create the log object with correct structure
+    const logObject = {
+      timestamp: info.timestamp,
+      level: info.level,
+      category: info.category || categories.default,
+      message: info.message,
+      ...trackingInfo,
+      ...rest
+    };
+    
+    // Remove redundant/empty properties
+    Object.keys(logObject).forEach(key => {
+      if (logObject[key] === undefined || logObject[key] === '') {
+        delete logObject[key];
+      }
+    });
+    
+    return JSON.stringify(logObject);
+  })
 );
 
 // Get log level from environment variable
@@ -162,10 +193,20 @@ logger.logRequest = (req) => {
     url: req.originalUrl || req.url,
     remoteAddress: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
     userAgent: req.headers['user-agent'] || '',
-    userId: req.user ? req.user.id : 'unauthenticated'
   };
   
-  logger.http(`REQUEST: ${JSON.stringify(reqData)}`, { category: categories.api });
+  // Include tracking information if available
+  const tracking = {
+    userId: req.user?.id || 'unauthenticated',
+    sessionId: req.sessionId || 'unknown',
+    requestId: req.requestId || 'unknown',
+    userRole: req.user?.role || 'guest'
+  };
+  
+  logger.http(`REQUEST: ${JSON.stringify(reqData)}`, { 
+    category: categories.api,
+    tracking
+  });
   return reqData;
 };
 
@@ -182,7 +223,18 @@ logger.logResponse = (req, res, responseTime = null) => {
     responseTime: responseTime ? `${responseTime}ms` : undefined
   };
   
-  logger.http(`RESPONSE: ${JSON.stringify(resData)}`, { category: categories.api });
+  // Include tracking information if available with most current user info
+  const tracking = {
+    userId: req.user?.id || 'unauthenticated',
+    sessionId: req.sessionId || 'unknown',
+    requestId: req.requestId || 'unknown',
+    userRole: req.user?.role || 'guest'
+  };
+  
+  logger.http(`RESPONSE: ${JSON.stringify(resData)}`, { 
+    category: categories.api,
+    tracking
+  });
 };
 
 // Category-specific loggers

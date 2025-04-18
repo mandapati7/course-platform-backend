@@ -1241,6 +1241,114 @@
 				}
 			],
 			"description": "Endpoints for managing video content with Vimeo integration. These endpoints handle video uploads, playback, preview settings, and video progress tracking."
+		},
+		{
+			"name": "Client Logs",
+			"item": [
+				{
+					"name": "Send Client Logs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201 or 202\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([201, 202]);",
+									"});",
+									"",
+									"pm.test(\"Response has correct structure\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('success');",
+									"    if (pm.response.code === 201) {",
+									"        pm.expect(jsonData.data).to.have.property('id');",
+									"        pm.expect(jsonData.data).to.have.property('logCount');",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sessionId\": \"{{$guid}}\",\n    \"deviceInfo\": {\n        \"userAgent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36\",\n        \"platform\": \"Windows\",\n        \"screenSize\": {\n            \"width\": 1920,\n            \"height\": 1080\n        },\n        \"language\": \"en-US\"\n    },\n    \"logs\": [\n        {\n            \"level\": \"info\",\n            \"message\": \"User viewed course landing page\",\n            \"timestamp\": \"{{$isoTimestamp}}\",\n            \"metadata\": {\n                \"courseId\": \"6071a2e5c25e440fe805f3c2\",\n                \"referrer\": \"homepage\"\n            }\n        },\n        {\n            \"level\": \"warning\",\n            \"message\": \"Video failed to load on first attempt\",\n            \"timestamp\": \"{{$isoTimestamp}}\",\n            \"metadata\": {\n                \"videoId\": \"vimeo_12345678\",\n                \"attemptNumber\": 1\n            }\n        },\n        {\n            \"level\": \"error\",\n            \"message\": \"Payment processing failed\",\n            \"timestamp\": \"{{$isoTimestamp}}\",\n            \"metadata\": {\n                \"errorCode\": \"STRIPE_DECLINED\",\n                \"courseId\": \"6071a2e5c25e440fe805f3c2\"\n            }\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/client-logs",
+							"host": ["{{base_url}}"],
+							"path": ["client-logs"]
+						},
+						"description": "Send batched client-side logs to the server. This endpoint allows clients to send multiple log entries in a single request, optimized for asynchronous processing. Logs can include info, warning, error, or debug level messages with optional metadata. The endpoint will associate logs with the user's session and account (if authenticated)."
+					}
+				},
+				{
+					"name": "Get Logs by Session ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/client-logs/:sessionId",
+							"host": ["{{base_url}}"],
+							"path": ["client-logs", ":sessionId"],
+							"variable": [
+								{
+									"key": "sessionId",
+									"value": "your-session-id-here",
+									"description": "The session ID to retrieve logs for"
+								}
+							]
+						},
+						"description": "Retrieve all logs for a specific session ID. This endpoint requires admin privileges and is useful for troubleshooting user-reported issues by examining their session history."
+					}
+				},
+				{
+					"name": "Get Logs by User ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/client-logs/user/:userId",
+							"host": ["{{base_url}}"],
+							"path": ["client-logs", "user", ":userId"],
+							"variable": [
+								{
+									"key": "userId",
+									"value": "user-id-here",
+									"description": "The user ID to retrieve logs for"
+								}
+							]
+						},
+						"description": "Retrieve all logs from all sessions for a specific user. This endpoint requires admin privileges and is useful for building a comprehensive user activity timeline across multiple sessions."
+					}
+				}
+			],
+			"description": "Endpoints for client-side logging and user journey tracking. These provide a way for client applications to send logs to the server for storage and analysis, helping to create unified timelines of user activity across both client and server."
 		}
 	]
 }

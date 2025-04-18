@@ -5,9 +5,20 @@ const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log the error for debugging
-  logger.error(`Error: ${err.message}`);
-  logger.debug(`Error stack: ${err.stack}`);
+  // Get most up-to-date tracking info for error logs
+  // By this point auth middleware should have added user info if authenticated
+  const tracking = {
+    userId: req.user?.id || 'unauthenticated',
+    sessionId: req.sessionId || 'unknown',
+    requestId: req.requestId || 'unknown',
+    userRole: req.user?.role || 'guest',
+    clientIp: req.headers['x-forwarded-for'] || req.connection.remoteAddress,
+    userAgent: req.headers['user-agent'] || 'unknown'
+  };
+
+  // Log the error with tracking information
+  logger.error(`Error: ${err.message}`, { tracking });
+  logger.debug(`Error stack: ${err.stack}`, { tracking });
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
@@ -29,13 +40,16 @@ const errorHandler = (err, req, res, next) => {
 
   // Version error
   if (err.name === 'VersionError') {
-    logger.error('MongoDB version conflict:', err);
+    logger.error('MongoDB version conflict:', { ...err, tracking });
     error = new ErrorResponse('Data conflict occurred. Please try again.', 409);
   }
 
+  // Include tracking IDs in error response for correlation
   res.status(error.statusCode || 500).json({
     success: false,
-    message: error.message || 'Server Error'
+    message: error.message || 'Server Error',
+    requestId: req.requestId || 'unknown',
+    timestamp: new Date().toISOString()
   });
 };
 

@@ -28,6 +28,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const errorHandler = require("./middleware/error");
+const trackRequest = require("./middleware/tracking");
 const connectDB = require("./config/database");
 
 // Route files
@@ -36,11 +37,18 @@ const courseRoutes = require("./routes/courses");
 const paymentRoutes = require("./routes/payments");
 const notificationRoutes = require("./routes/notifications");
 const videoRoutes = require("./routes/videos");
+const logRoutes = require("./routes/logs");
 
 // Connect to database
 connectDB();
 
 const app = express();
+
+// Cookie parser - needed before tracking middleware for session cookies
+app.use(cookieParser());
+
+// Apply tracking middleware early to capture all requests
+app.use(trackRequest);
 
 // Application-level request logging middleware
 app.use((req, res, next) => {
@@ -78,11 +86,9 @@ app.use(
       "http://localhost:8081",
     ],
     credentials: true,
+    exposedHeaders: ['X-Request-ID', 'X-Session-ID'], // Expose tracking headers to frontend
   })
 );
-
-// Cookie parser
-app.use(cookieParser());
 
 // Set static folder
 app.use(express.static(path.join(__dirname, "public")));
@@ -109,6 +115,7 @@ app.use("/api/v1/courses", courseRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/videos", videoRoutes);
+app.use("/api/v1/client-logs", logRoutes);
 
 // Error handler middleware
 app.use(errorHandler);

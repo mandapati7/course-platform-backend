@@ -10,5 +10,6 @@ backend/package-lock.json
 coverage/*
 logs/
 logs/*
-
+*.log
+*.log.*
   
