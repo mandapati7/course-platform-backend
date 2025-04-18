@@ -1,0 +1,1 @@
+"// Test script to check logger behavior\nconst dotenv = require('dotenv');\ndotenv.config({path: '.env.development'});\nconsole.log('Testing logger import...');\nconst logger = require('./src/utils/logger');\nconsole.log('Logger imported.');\nlogger.info('Test info log');\nlogger.error('Test error log');\nconsole.log('Test complete.');" 

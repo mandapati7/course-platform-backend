@@ -18,6 +18,13 @@ if (result.error) {
 // Import the logger after loading environment variables
 const logger = require('./utils/logger');
 
+// Initialize file transports only when the server starts
+// This prevents log files from being created by scripts that import the logger
+logger.initFileTransports();
+
+// Override console methods for server process
+logger.overrideConsoleMethods();
+
 logger.info(`Looking for environment file: ${envPath}`);
 logger.info(`Successfully loaded environment from: ${envFile}`);
 logger.info(`NODE_ENV: ${process.env.NODE_ENV}`);
@@ -44,37 +51,13 @@ connectDB();
 
 const app = express();
 
-// Cookie parser - needed before tracking middleware for session cookies
-app.use(cookieParser());
-
 // Apply tracking middleware early to capture all requests
 app.use(trackRequest);
 
-// Application-level request logging middleware
-app.use((req, res, next) => {
-  // Log the request when it comes in
-  logger.logRequest(req);
-  
-  // Track response time
-  const startTime = Date.now();
-  
-  // Log response when it goes out
-  const originalEnd = res.end;
-  res.end = function(chunk, encoding) {
-    // Calculate response time
-    const responseTime = Date.now() - startTime;
-    
-    // Call the original end method
-    originalEnd.apply(res, arguments);
-    
-    // Log the response
-    logger.logResponse(req, res, responseTime);
-  };
-  
-  next();
-});
+// Cookie parser - needed before tracking middleware for session cookies
+app.use(cookieParser());
 
-// Middleware to handle raw body
+// Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

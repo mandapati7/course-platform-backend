@@ -1,103 +1,142 @@
 const winston = require('winston');
-const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
+require('winston-daily-rotate-file');
 const fs = require('fs');
 
 // Create logs directory if it doesn't exist
 const logDir = path.join(process.cwd(), 'logs');
 if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
+  fs.mkdirSync(logDir);
 }
 
-// Define log categories and their colors
-const categories = {
-  database: 'DATABASE',
-  security: 'SECURITY',
-  api: 'API',
-  system: 'SYSTEM',
-  video: 'VIDEO',
-  payment: 'PAYMENT',
-  default: 'DEFAULT'
-};
-
-// Define log levels and colors
+// Custom log levels
 const levels = {
   error: 0,
   warn: 1,
   info: 2,
   http: 3,
   debug: 4,
-  silly: 5
 };
 
-const colors = {
-  error: 'red',
-  warn: 'yellow',
-  info: 'green',
-  http: 'magenta',
-  debug: 'blue',
-  silly: 'grey',
-  database: 'cyan',
-  security: 'brightRed',
-  api: 'brightGreen',
-  system: 'brightBlue',
-  video: 'brightMagenta',
-  payment: 'brightYellow',
-  default: 'white'
+// Categories for logs to organize them into separate files
+const categories = {
+  default: 'DEFAULT',
+  api: 'API',
+  database: 'DATABASE',
+  security: 'SECURITY',
+  system: 'SYSTEM',
+  video: 'VIDEO',
+  payment: 'PAYMENT',
 };
 
-// Set up log format with colors
-winston.addColors(colors);
+// Helper function to properly format error objects for logging
+const formatError = (err) => {
+  if (err instanceof Error) {
+    return {
+      message: err.message,
+      stack: err.stack,
+      name: err.name,
+      // Include any custom properties from the error
+      ...Object.getOwnPropertyNames(err).reduce((acc, prop) => {
+        if (!['message', 'stack', 'name'].includes(prop)) {
+          acc[prop] = err[prop];
+        }
+        return acc;
+      }, {})
+    };
+  }
+  return err;
+};
 
-// Update the consoleFormat to include tracking IDs
+// Format for console output (colorized)
 const consoleFormat = winston.format.combine(
+  winston.format.colorize(),
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
-  winston.format.colorize({ all: false }),
-  winston.format.printf(info => {
-    const { timestamp, level, message, category = categories.default, tracking, ...rest } = info;
+  winston.format.printf(({ timestamp, level, message, category, tracking, error, ...rest }) => {
+    // Basic log line
+    let logLine = `${timestamp} ${level}: `;
     
-    // Format tracking information if present
-    let trackingStr = '';
+    // If message is an Error object, format it properly
+    if (message instanceof Error) {
+      logLine += message.message;
+      // Move error details to rest
+      rest = { ...rest, errorDetails: formatError(message) };
+    } else {
+      logLine += message;
+    }
+    
+    // Add category if present
+    if (category) {
+      logLine += ` [${category}]`;
+    }
+    
+    // Add tracking info if present
     if (tracking) {
-      const { sessionId, requestId, userId } = tracking;
-      if (sessionId || requestId || userId) {
-        trackingStr = `[${sessionId?.substring(0, 8) || '-'}:${requestId?.substring(0, 8) || '-'}:${userId?.substring(0, 8) || '-'}] `;
+      const { userId, sessionId, requestId, userRole } = tracking;
+      if (userId) logLine += ` User:${userId.substr(0, 6)}...`;
+      if (sessionId) logLine += ` Session:${sessionId.substr(0, 6)}...`;
+      if (requestId) logLine += ` Request:${requestId.substr(0, 6)}...`;
+      if (userRole) logLine += ` Role:${userRole}`;
+    }
+    
+    // Handle error property specifically
+    if (error) {
+      const formattedError = formatError(error);
+      rest.errorDetails = formattedError;
+    }
+    
+    // Add any additional metadata
+    if (Object.keys(rest).length > 0) {
+      try {
+        logLine += ` ${JSON.stringify(rest)}`;
+      } catch (e) {
+        logLine += ` [Metadata could not be stringified: ${e.message}]`;
       }
     }
     
-    const categoryStr = category ? `[${category}] ` : '';
-    const restString = Object.keys(rest).length ? JSON.stringify(rest, null, 2) : '';
-    
-    return `[${timestamp}] [${level}] ${categoryStr}${trackingStr}${message} ${restString}`;
+    return logLine;
   })
 );
 
-// Update the fileFormat to better structure tracking information
+// Format for file output (json)
 const fileFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
-  winston.format.printf(info => {
-    // Extract tracking information if present
-    const { tracking, ...rest } = info;
-    const trackingInfo = tracking ? { tracking } : {};
+  winston.format.json(),
+  winston.format((logObject) => {
+    // Handle message if it's an Error object
+    if (logObject.message instanceof Error) {
+      logObject.errorDetails = formatError(logObject.message);
+      logObject.message = logObject.message.message;
+    }
     
-    // Create the log object with correct structure
-    const logObject = {
-      timestamp: info.timestamp,
-      level: info.level,
-      category: info.category || categories.default,
-      message: info.message,
-      ...trackingInfo,
-      ...rest
-    };
+    // Handle specific error property if present
+    if (logObject.error) {
+      logObject.errorDetails = formatError(logObject.error);
+    }
     
-    // Remove redundant/empty properties
-    Object.keys(logObject).forEach(key => {
+    // Remove empty fields to keep logs clean
+    Object.keys(logObject).forEach((key) => {
       if (logObject[key] === undefined || logObject[key] === '') {
         delete logObject[key];
       }
     });
     
-    return JSON.stringify(logObject);
+    return logObject;
+  })(),
+  winston.format.printf((logObject) => {
+    try {
+      return JSON.stringify(logObject);
+    } catch (e) {
+      // If stringifying fails, create a simpler object
+      const safeObject = {
+        timestamp: logObject.timestamp,
+        level: logObject.level,
+        message: 'Error serializing log entry',
+        serializationError: e.message,
+        originalMessage: typeof logObject.message === 'string' ? logObject.message : '[non-string message]'
+      };
+      return JSON.stringify(safeObject);
+    }
   })
 );
 
@@ -106,19 +145,7 @@ const env = process.env.NODE_ENV || 'development';
 const configuredLogLevel = process.env.LOG_LEVEL || (env === 'production' ? 'info' : 'debug');
 
 // Get filter settings
-const httpFilter = process.env.LOG_FILTER_HTTP !== 'false';
-
-// Create separate transport for each log category
-const createCategoryTransport = (category) => {
-  return new DailyRotateFile({
-    filename: path.join(logDir, `%DATE%-${category.toLowerCase()}.log`),
-    datePattern: 'YYYY-MM-DD',
-    maxSize: '20m',
-    maxFiles: '14d',
-    format: fileFormat,
-    level: configuredLogLevel,
-  });
-};
+let httpFilter = process.env.LOG_FILTER_HTTP !== 'false';
 
 // Filter for HTTP logs (can be enabled/disabled)
 const httpFilterFn = winston.format((info) => {
@@ -128,7 +155,25 @@ const httpFilterFn = winston.format((info) => {
   return info;
 });
 
-// Create the logger
+// Create category filters
+const createCategoryFilter = (categoryName) => {
+  return winston.format((info) => {
+    if (info.category === categoryName) {
+      return info;
+    }
+    return false;
+  })();
+};
+
+// Create default category filter (logs without a specific category)
+const defaultCategoryFilter = winston.format((info) => {
+  if (!info.category || info.category === categories.default) {
+    return info;
+  }
+  return false;
+})();
+
+// Create a base logger with just console transport initially
 const logger = winston.createLogger({
   level: configuredLogLevel,
   levels,
@@ -138,24 +183,46 @@ const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'course-platform' },
   transports: [
-    // Console transport
+    // Console transport (shows all logs)
     new winston.transports.Console({
       format: consoleFormat,
       level: configuredLogLevel
-    }),
-    
-    // Common log file
-    new DailyRotateFile({
+    })
+  ],
+  exitOnError: false,
+});
+
+// Flag to track if file transports have been initialized
+let fileTransportsInitialized = false;
+
+// Function to initialize file transports - MUST be called explicitly to create log files
+logger.initFileTransports = () => {
+  if (fileTransportsInitialized) {
+    logger.info('File transports already initialized, skipping');
+    return logger;
+  }
+
+  logger.info('Initializing file transport log handlers');
+
+  // Add file transports
+  logger.add(
+    // Default category log file (only logs without a specific category)
+    new winston.transports.DailyRotateFile({
       filename: path.join(logDir, '%DATE%-course-platform.log'),
       datePattern: 'YYYY-MM-DD',
       maxSize: '20m',
       maxFiles: '14d',
-      format: fileFormat,
+      format: winston.format.combine(
+        defaultCategoryFilter,
+        fileFormat
+      ),
       level: configuredLogLevel
-    }),
-    
-    // Error log file (errors only)
-    new DailyRotateFile({
+    })
+  );
+  
+  // Error log file (all errors, regardless of category)
+  logger.add(
+    new winston.transports.DailyRotateFile({
       filename: path.join(logDir, '%DATE%-error.log'),
       datePattern: 'YYYY-MM-DD',
       maxSize: '20m',
@@ -163,16 +230,43 @@ const logger = winston.createLogger({
       format: fileFormat,
       level: 'error'
     })
-  ],
-  exitOnError: false,
-});
+  );
 
-// Add separate transport for each category
-Object.values(categories).forEach(category => {
-  if (category !== 'DEFAULT') {
-    logger.add(createCategoryTransport(category));
-  }
-});
+  // Add separate transport for each category
+  Object.entries(categories).forEach(([key, categoryName]) => {
+    if (categoryName !== categories.default) {
+      logger.add(
+        new winston.transports.DailyRotateFile({
+          filename: path.join(logDir, `%DATE%-${key.toLowerCase()}.log`),
+          datePattern: 'YYYY-MM-DD',
+          maxSize: '20m',
+          maxFiles: '14d',
+          format: winston.format.combine(
+            createCategoryFilter(categoryName),
+            fileFormat
+          ),
+          level: configuredLogLevel
+        })
+      );
+    }
+  });
+  
+  fileTransportsInitialized = true;
+  logger.info('File transports initialized successfully');
+  return logger;
+};
+
+// Function to close all log transports gracefully
+logger.closeTransports = () => {
+  return new Promise((resolve, reject) => {
+    logger.info('Closing all log transports');
+    logger.end(() => {
+      fileTransportsInitialized = false;
+      logger.info('Log transports closed successfully');
+      resolve();
+    });
+  });
+};
 
 // Add HTTP request logging with category
 logger.stream = {
@@ -246,12 +340,47 @@ logger.video = (message, meta = {}) => logger.info(message, { ...meta, category:
 logger.payment = (message, meta = {}) => logger.info(message, { ...meta, category: categories.payment });
 
 // Category-specific error loggers
-logger.dbError = (message, meta = {}) => logger.error(message, { ...meta, category: categories.database });
-logger.securityError = (message, meta = {}) => logger.error(message, { ...meta, category: categories.security });
-logger.apiError = (message, meta = {}) => logger.error(message, { ...meta, category: categories.api });
-logger.systemError = (message, meta = {}) => logger.error(message, { ...meta, category: categories.system });
-logger.videoError = (message, meta = {}) => logger.error(message, { ...meta, category: categories.video });
-logger.paymentError = (message, meta = {}) => logger.error(message, { ...meta, category: categories.payment });
+logger.dbError = (message, meta = {}) => {
+  if (message instanceof Error) {
+    return logger.error(message.message, { ...meta, category: categories.database, error: message });
+  }
+  return logger.error(message, { ...meta, category: categories.database });
+};
+
+logger.securityError = (message, meta = {}) => {
+  if (message instanceof Error) {
+    return logger.error(message.message, { ...meta, category: categories.security, error: message });
+  }
+  return logger.error(message, { ...meta, category: categories.security });
+};
+
+logger.apiError = (message, meta = {}) => {
+  if (message instanceof Error) {
+    return logger.error(message.message, { ...meta, category: categories.api, error: message });
+  }
+  return logger.error(message, { ...meta, category: categories.api });
+};
+
+logger.systemError = (message, meta = {}) => {
+  if (message instanceof Error) {
+    return logger.error(message.message, { ...meta, category: categories.system, error: message });
+  }
+  return logger.error(message, { ...meta, category: categories.system });
+};
+
+logger.videoError = (message, meta = {}) => {
+  if (message instanceof Error) {
+    return logger.error(message.message, { ...meta, category: categories.video, error: message });
+  }
+  return logger.error(message, { ...meta, category: categories.video });
+};
+
+logger.paymentError = (message, meta = {}) => {
+  if (message instanceof Error) {
+    return logger.error(message.message, { ...meta, category: categories.payment, error: message });
+  }
+  return logger.error(message, { ...meta, category: categories.payment });
+};
 
 // Helper to change log level at runtime
 logger.setLogLevel = (level) => {
@@ -270,11 +399,96 @@ logger.setHttpLogging = (enabled) => {
   return httpFilter;
 };
 
-// Overriding console methods to use winston logger with categories
-console.log = (...args) => logger.info(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
-console.info = (...args) => logger.info(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
-console.warn = (...args) => logger.warn(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
-console.error = (...args) => logger.error(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
-console.debug = (...args) => logger.debug(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
+// Flag to track if console methods have been overridden
+let consoleMethodsOverridden = false;
+
+// Function to override console methods
+logger.overrideConsoleMethods = () => {
+  if (consoleMethodsOverridden) {
+    return;
+  }
+  
+  // Save the original console methods
+  const originalConsole = {
+    log: console.log,
+    info: console.info,
+    warn: console.warn,
+    error: console.error,
+    debug: console.debug
+  };
+
+  // Override console methods to use winston logger with categories and better formatting
+  console.log = (...args) => {
+    const message = args.length === 1 && typeof args[0] === 'string' 
+      ? args[0] 
+      : args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+    
+    // Default to 'system' category for uncategorized logs
+    logger.info(message, { category: categories.system });
+  };
+  
+  console.info = (...args) => {
+    const message = args.length === 1 && typeof args[0] === 'string' 
+      ? args[0] 
+      : args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+    
+    logger.info(message, { category: categories.system });
+  };
+  
+  console.warn = (...args) => {
+    const message = args.length === 1 && typeof args[0] === 'string' 
+      ? args[0] 
+      : args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+    
+    logger.warn(message, { category: categories.system });
+  };
+  
+  console.error = (...args) => {
+    // Handle Error objects properly
+    if (args.length === 1 && args[0] instanceof Error) {
+      const error = args[0];
+      logger.error(error.message, { 
+        category: categories.system,
+        error: error
+      });
+      return;
+    }
+    
+    const message = args.map(arg => {
+      if (arg instanceof Error) {
+        return arg.message;
+      }
+      return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+    }).join(' ');
+    
+    logger.error(message, { category: categories.system });
+  };
+  
+  console.debug = (...args) => {
+    const message = args.length === 1 && typeof args[0] === 'string' 
+      ? args[0] 
+      : args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+    
+    logger.debug(message, { category: categories.system });
+  };
+  
+  consoleMethodsOverridden = true;
+  logger.info('Console methods have been overridden to use the logger', { category: categories.system });
+  
+  // Return original console methods for restoration if needed
+  return originalConsole;
+};
+
+// Function to restore original console methods
+logger.restoreConsoleMethods = (original) => {
+  if (original) {
+    console.log = original.log;
+    console.info = original.info;
+    console.warn = original.warn;
+    console.error = original.error;
+    console.debug = original.debug;
+    consoleMethodsOverridden = false;
+  }
+};
 
 module.exports = logger;
